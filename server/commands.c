@@ -3,6 +3,30 @@
 #include <stdio.h>
 #include "data.h"
 #include "server.h"
+#include "map.h"
+#include <process.h>
+
+
+struct threadData {
+	MAPPING map;
+	size_t startIndex;
+	size_t count;
+};
+
+
+const char *cryptKey = "123";
+volatile long cryptProgress = 0;
+
+
+static char *xor(
+	_In_reads_bytes_(count) char *string,
+	size_t count,
+	_In_ const char *key
+	);
+
+unsigned ComputeNrOfThreads(size_t FileSize);
+unsigned WINAPI CryptoThreadFunc(void* Arguments);
+
 
 int
 ExceptionFilter(
@@ -10,8 +34,14 @@ ExceptionFilter(
 	EXCEPTION_POINTERS *ExceptionPointers
 )
 {
-	printf("[EXCEPTION] ExceptionCode=0x%x, EIP=%p, ESP=%p\n", Code, ExceptionPointers->ContextRecord->Eip, ExceptionPointers->ContextRecord->Esp);
-	Log("[EXCEPTION] ExceptionCode=0x%x, EIP=%p, ESP=%p\n", Code, ExceptionPointers->ContextRecord->Eip, ExceptionPointers->ContextRecord->Esp);
+	printf("[EXCEPTION] ExceptionCode=0x%x, EIP=%d, ESP=%d\n",
+		Code,
+		ExceptionPointers->ContextRecord->Eip,
+		ExceptionPointers->ContextRecord->Esp);
+	Log("[EXCEPTION] ExceptionCode=0x%x, EIP=%d, ESP=%d\n",
+		Code,
+		ExceptionPointers->ContextRecord->Eip,
+		ExceptionPointers->ContextRecord->Esp);
 
 	return EXCEPTION_EXECUTE_HANDLER;
 }
@@ -80,8 +110,8 @@ _AddFileToOutput(
 	// Add file name to Output, but replace '.txt' with ' '
 	strcat_s(Output, DEFAULT_BUFLEN, File);
 	*OutLength += len - 3;
-	Output[*OutLength - 1] = ' ';   //
-	Output[*OutLength] = 0;         //
+	Output[*OutLength - 1] = ' ';
+	Output[*OutLength] = 0;
 }
 
 
@@ -195,14 +225,11 @@ CmdHandleGet(
 		return;
 	}
 
-	//printf("Success!\n");
-
 	sprintf_s(Output, DEFAULT_BUFLEN, "[OK]\n");
 	*OutLength = strlen(Output);
 
 	*OutLength += fread_s(&Output[*OutLength], DEFAULT_BUFLEN, 1, DEFAULT_BUFLEN, file);
 
-	///
 	fclose(file);
 }
 
@@ -210,29 +237,47 @@ CmdHandleGet(
 // New commands
 //
 
-
 //
 // Creates a new file in the user's directory. File name is given as input parameter.
 //
 void
 CmdHandleNewFile(
 	int UserId,
-	_In_ char *Message
+	_In_ char *Message,
+	_Out_ char *Output,
+	_Out_ size_t *OutLength
 )
 {
 	FILE *file;
-	char filename[64];
+	char filename[DEFAULT_MAX_FILENAME];
 
-	sprintf_s(filename, 64, ".\\%d\\%s", UserId, Message);
+	if ((NULL != strstr(Message, "..")) ||
+		(NULL != strstr(Message, "CON")) ||
+		(NULL != strstr(Message, "\\")))
+	{
+		sprintf_s(Output, DEFAULT_BUFLEN, "[ERROR] Filename contains illegal characters.");
+		*OutLength = strlen(Output);
+
+		printf("Filename contains illegal characters.");
+		return;
+	}
+
+	sprintf_s(filename, DEFAULT_MAX_FILENAME, ".\\%d\\%s", UserId, Message);
 
 	fopen_s(&file, filename, "w");
 	if (NULL == file)
 	{
-		printf("File &s could not be created.\n", filename);
+		sprintf_s(Output, DEFAULT_BUFLEN, "[ERROR] File could not be created.");
+		*OutLength = strlen(Output);
+
+		printf("File %s could not be created.\n", filename);
 		return;
 	}
 
 	fclose(file);
+
+	sprintf_s(Output, DEFAULT_BUFLEN, "[OK] File created.");
+	*OutLength = strlen(Output);
 }
 
 
@@ -248,29 +293,30 @@ void CmdHandleWriteFile(
 	HANDLE hFind;
 	char folder[32];
 	FILE *file;
-	char filename[64];
+	char filename[DEFAULT_MAX_FILENAME];
 
 	// Search for the created file in the user's directory
-	sprintf_s(folder, 20, ".\\%d\\*", UserId);
+	sprintf_s(folder, 20, ".\\%d\\*.txt", UserId);
 	printf("Searching in folder: %s\n", folder);
 
 	hFind = FindFirstFileA(folder, &FindFileData);
 	if (INVALID_HANDLE_VALUE == hFind)
 	{
-		printf("Could not find user's file. Error: (%d)\n", GetLastError());
+		printf("Could not find user's file. Error: %d\n", GetLastError());
 		return;
 	}
 	FindClose(hFind);
-	
-	sprintf_s(filename, 64, ".\\%d\\%s", UserId, FindFileData.cFileName);
-	fopen_s(&file, filename, "a");
+
+	// Open the (found) user's file for writing
+	sprintf_s(filename, DEFAULT_MAX_FILENAME, ".\\%d\\%s", UserId, FindFileData.cFileName);
+	fopen_s(&file, filename, "w");
 	if (NULL == file)
 	{
-		printf("File &s could not be opened.\n", filename);
+		printf("File %s could not be opened.\n", filename);
 		return;
 	}
 
-	fwrite(Message, sizeof(char), sizeof(Message) / sizeof(char), file);
+	fwrite(Message, sizeof(char), strlen(Message), file);
 
 	fclose(file);
 }
@@ -281,10 +327,127 @@ void CmdHandleWriteFile(
 //
 void CmdHandleEncryptFile(
 	int UserId,
-	_In_ char *Message
+	_In_ char *Message,
+	_Out_ char *Output,
+	_Out_ size_t *OutLength
 )
 {
-	
+	char filename[DEFAULT_MAX_FILENAME];
+	MAPPING map;
+	DWORD result;
+	HANDLE hThreads[DEFAULT_MAX_THREADS];
+	unsigned threadIDs[DEFAULT_MAX_THREADS];
+	unsigned threadNr = 1;
+	struct threadData threadArg[DEFAULT_MAX_THREADS];
+
+	if ((NULL != strstr(Message, "..")) ||
+		(NULL != strstr(Message, "CON")) ||
+		(NULL != strstr(Message, "\\")))
+	{
+		sprintf_s(Output, DEFAULT_BUFLEN, "[ERROR] Filename contains illegal characters.");
+		*OutLength = strlen(Output);
+
+		printf("Filename contains illegal characters.");
+		return;
+	}
+
+	sprintf_s(filename, DEFAULT_MAX_FILENAME, ".\\%d\\%s", UserId, Message);
+
+	result = MapFile(filename, GENERIC_READ | GENERIC_WRITE, &map);
+	if (ERROR_SUCCESS != result)
+	{
+		sprintf_s(Output, DEFAULT_BUFLEN, "[ERROR] Could not map user's file.");
+		*OutLength = strlen(Output);
+
+		printf("Could not map user's file. Error: %d\n", GetLastError());
+		return;
+	}
+
+	// Create the threads and split the work
+	cryptProgress = 0;
+	threadNr = ComputeNrOfThreads(map.DataSize);
+
+	printf("Starting encryption with %u threads.\n", threadNr);
+	for (size_t i = 0; i < threadNr; i++)
+	{
+		threadArg[i].map = map;
+		threadArg[i].startIndex = WORKLOAD_PER_THREAD * i;
+		threadArg[i].count = WORKLOAD_PER_THREAD;
+		hThreads[i] = (HANDLE)_beginthreadex(NULL, 0, &CryptoThreadFunc, &threadArg[i], 0, &threadIDs[i]);
+	}
+
+	WaitForMultipleObjects(threadNr, hThreads, TRUE, 5000);
+	for (size_t i = 0; i < threadNr; i++)
+	{
+		//WaitForSingleObject(hThreads[0], INFINITE);
+		CloseHandle(hThreads[i]);
+	}
+
+	UnmapFile(&map);
+
+	printf("Progress after encryption: %d.\n", cryptProgress);
+
+	sprintf_s(Output, DEFAULT_BUFLEN, "[OK] File encrypted.");
+	*OutLength = strlen(Output);
+}
 
 
+//
+// Decide the number of threads based on the file size
+//
+unsigned ComputeNrOfThreads(size_t FileSize)
+{
+	unsigned exactDiv;
+
+	exactDiv = FileSize % WORKLOAD_PER_THREAD ? 1 : 0;
+	return FileSize / WORKLOAD_PER_THREAD + exactDiv;
+}
+
+
+//
+// Thread function responsible for encryption of the map portion
+// assigned to the given thread
+//
+unsigned WINAPI CryptoThreadFunc(void* Arguments)
+{
+	struct threadData *mapInfo;
+
+	mapInfo = (struct threadData*) Arguments;
+	char *submap = mapInfo->map.Data + mapInfo->startIndex;
+
+	submap = xor (submap, WORKLOAD_PER_THREAD, cryptKey);
+
+	_endthreadex(0);
+	return EXIT_SUCCESS;
+}
+
+
+//
+// Basic XOR encryption
+//
+static char *xor(
+	_In_reads_bytes_(count) char *string,
+	size_t count,
+	_In_ const char *key
+	)
+{
+	size_t keyLength = 0;
+	size_t i = 0;
+	char *s;
+
+	keyLength = strlen(key);
+	s = string;
+
+	while (*s && (i < count))
+	{
+		*s++ ^= key[i++ % keyLength];
+		if (0 == i % DEFAULT_PROGRESS_INC)
+		{
+			InterlockedAdd(&cryptProgress, (long)DEFAULT_PROGRESS_INC);
+		}
+	}
+
+	InterlockedAdd(&cryptProgress, (long)(i % DEFAULT_PROGRESS_INC));
+
+	return string;
 }

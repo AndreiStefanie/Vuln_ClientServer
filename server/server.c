@@ -262,16 +262,14 @@ BOOLEAN InterpretCommand(
 		{
 			// *State doesn't change
 
-			*OutLength = 0;
-			Output[0] = 0;
-
 			if (NULL == Parameter)
 			{
 				SetReply(Output, OutLength, "[ERROR] No file name provided.");
 				return TRUE;
 			}
 
-			CmdHandleNewFile(*UserId, Parameter);
+			CmdHandleNewFile(*UserId, Parameter, Output, OutLength);
+			//SetReply(Output, OutLength, "[OK] New file created.");
 
 			return TRUE;
 		}
@@ -281,9 +279,6 @@ BOOLEAN InterpretCommand(
 		{
 			// *State doesn't change
 
-			*OutLength = 0;
-			Output[0] = 0;
-
 			if (NULL == Parameter)
 			{
 				SetReply(Output, OutLength, "[ERROR] No file data provided.");
@@ -291,6 +286,7 @@ BOOLEAN InterpretCommand(
 			}
 
 			CmdHandleWriteFile(*UserId, Parameter);
+			SetReply(Output, OutLength, "[OK] Data written to file.");
 
 			return TRUE;
 		}
@@ -300,16 +296,14 @@ BOOLEAN InterpretCommand(
 		{
 			// *State doesn't change
 
-			*OutLength = 0;
-			Output[0] = 0;
-
 			if (NULL == Parameter)
 			{
 				SetReply(Output, OutLength, "[ERROR] No file name provided.");
 				return TRUE;
 			}
 
-			CmdHandleEncryptFile(*UserId, Parameter);
+			CmdHandleEncryptFile(*UserId, Parameter, Output, OutLength);
+			//SetReply(Output, OutLength, "[OK] File encrypted.");
 
 			return TRUE;
 		}

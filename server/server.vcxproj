@@ -96,12 +96,14 @@
     <ClCompile Include="..\utils\utils.c" />
     <ClCompile Include="commands.c" />
     <ClCompile Include="data.c" />
+    <ClCompile Include="map.c" />
     <ClCompile Include="server.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\utils\utils.h" />
     <ClInclude Include="commands.h" />
     <ClInclude Include="data.h" />
+    <ClInclude Include="map.h" />
     <ClInclude Include="server.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

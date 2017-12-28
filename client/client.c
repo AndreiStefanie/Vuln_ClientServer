@@ -19,344 +19,344 @@
 
 void
 PrintHelp(
-    void
-    )
+	void
+)
 {
-    printf("Available commands (those marked with * are client side commands):\n");
-    printf("  - user <username>        - Log in with given user name\n");
-    printf("  - pass <password>        - Enter the password for the given user\n");
-    printf("  - logoff                 - Log out\n");
-    printf("  - info <N>               - Retrieve information about the user. N means\n");
-    printf("                             how many fields to retrieve:\n");
-    printf("                             1 - username\n");
-    printf("                             2 - username and full name\n");
-    printf("                             3 - username, full name and email\n");
-    printf("  - list                   - Get list of messages\n");
-    printf("  - get <n>                - Retrieve the message with the given index\n");
-    printf("  - avail                  - Ask the server which are the available commands,\n");
-    printf("                             considering the connection state\n");
-    printf("  - exit                   - Notice the server and exit (recommended)\n");
-    printf("  * quit                   - Quit without noticing the server\n");
-    printf("  * help                   - Display this help\n");
+	printf("Available commands (those marked with * are client side commands):\n");
+	printf("  - user <username>        - Log in with given user name\n");
+	printf("  - pass <password>        - Enter the password for the given user\n");
+	printf("  - logoff                 - Log out\n");
+	printf("  - info <N>               - Retrieve information about the user. N means\n");
+	printf("                             how many fields to retrieve:\n");
+	printf("                             1 - username\n");
+	printf("                             2 - username and full name\n");
+	printf("                             3 - username, full name and email\n");
+	printf("  - list                   - Get list of messages\n");
+	printf("  - get <n>                - Retrieve the message with the given index\n");
+	printf("  - avail                  - Ask the server which are the available commands,\n");
+	printf("                             considering the connection state\n");
+	printf("  - exit                   - Notice the server and exit (recommended)\n");
+	printf("  * quit                   - Quit without noticing the server\n");
+	printf("  * help                   - Display this help\n");
 }
 
 BOOLEAN
 TryUserName(
-    SOCKET ConnectSocket,
-    char *Username,
-    BOOLEAN *Valid
-    )
+	SOCKET ConnectSocket,
+	char *Username,
+	BOOLEAN *Valid
+)
 {
-    int iResult;
-    char recvbuf[64];
-    char sendbuf[64] = "user ";
+	int iResult;
+	char recvbuf[64];
+	char sendbuf[64] = "user ";
 
-    strcat_s(sendbuf, 64, Username);
+	strcat_s(sendbuf, 64, Username);
 
-    *Valid = FALSE;
+	*Valid = FALSE;
 
-    // Send buffer
-    iResult = send( ConnectSocket, sendbuf, (int)strlen(sendbuf), 0 );
-    if (iResult == SOCKET_ERROR)
-    {
-        printf("send failed with error: %d\n", WSAGetLastError());
-        closesocket(ConnectSocket);
-        WSACleanup();
-        return FALSE;
-    }
+	// Send buffer
+	iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("send failed with error: %d\n", WSAGetLastError());
+		closesocket(ConnectSocket);
+		WSACleanup();
+		return FALSE;
+	}
 
-    //printf("Bytes Sent: %ld\n", iResult);
+	//printf("Bytes Sent: %ld\n", iResult);
 
-    // Receive from server
-    iResult = recv(ConnectSocket, recvbuf, 64, 0);
-    if ( iResult > 0 )
-    {
-        //printf("Bytes received: %d\n", iResult);
+	// Receive from server
+	iResult = recv(ConnectSocket, recvbuf, 64, 0);
+	if (iResult > 0)
+	{
+		//printf("Bytes received: %d\n", iResult);
 
-        recvbuf[iResult] = 0;
+		recvbuf[iResult] = 0;
 
-        //printf("%s: %s\n", Username, recvbuf);
+		//printf("%s: %s\n", Username, recvbuf);
 
-        if (0 == _stricmp(recvbuf, "[OK] User is valid, provide password."))
-        {
-            ///printf("User: %s is correct!\n", Username);
-            *Valid = TRUE;
-            return TRUE;
-        }
-    }
-    else
-    {
-        return FALSE;
-    }
+		if (0 == _stricmp(recvbuf, "[OK] User is valid, provide password."))
+		{
+			///printf("User: %s is correct!\n", Username);
+			*Valid = TRUE;
+			return TRUE;
+		}
+	}
+	else
+	{
+		return FALSE;
+	}
 
-    return TRUE;
+	return TRUE;
 }
 
 #define LETTERS     ((int)('z' + 1 - 'a'))
 
 BOOLEAN
 GenerateUser(
-    char *User,
-    int Len,
-    int Index
-    )
+	char *User,
+	int Len,
+	int Index
+)
 {
-    int i;
-    for (i = 0; i < Len; i++)
-    {
-        User[i] = 'a';
-    }
-    User[i] = 0;
+	int i;
+	for (i = 0; i < Len; i++)
+	{
+		User[i] = 'a';
+	}
+	User[i] = 0;
 
-    i = Len - 1;
-    while (i >= 0)
-    {
-        char x = Index % LETTERS;
-        Index /= LETTERS;
+	i = Len - 1;
+	while (i >= 0)
+	{
+		char x = Index % LETTERS;
+		Index /= LETTERS;
 
-        User[i] += x;
+		User[i] += x;
 
-        i--;
-    }
+		i--;
+	}
 
-    if (Index > 0)
-    {
-        printf("Din index a ramas %d\n", Index);
-        return FALSE;
-    }
+	if (Index > 0)
+	{
+		printf("Din index a ramas %d\n", Index);
+		return FALSE;
+	}
 
-    //printf(": %s\n", User);
-    return TRUE;
+	//printf(": %s\n", User);
+	return TRUE;
 }
 
 
 BOOLEAN
 UserBruteForce(
-    SOCKET Socket
-    )
+	SOCKET Socket
+)
 {
-    BOOLEAN valid = FALSE;
-    char x[5];
-    //BOOLEAN res;
-    int i;
+	BOOLEAN valid = FALSE;
+	char x[5];
+	//BOOLEAN res;
+	int i;
 
-    UNREFERENCED_PARAMETER(Socket);
-    
-    /*if (!TryUserName(Socket, "cucu", &valid))
-    {
-        return FALSE;
-    }*/
-    for (i = 0; i < 500000; i++)    // 456976
-    {
-        if (!GenerateUser(x, 3, i))
-        {
-            printf("%d\n", i);
-            break;
-        }
-        //printf(">> %s\n", x);
+	UNREFERENCED_PARAMETER(Socket);
 
-        if (!TryUserName(Socket, x, &valid))
-        {
-            break;
-        }
+	/*if (!TryUserName(Socket, "cucu", &valid))
+	{
+		return FALSE;
+	}*/
+	for (i = 0; i < 500000; i++)    // 456976
+	{
+		if (!GenerateUser(x, 3, i))
+		{
+			printf("%d\n", i);
+			break;
+		}
+		//printf(">> %s\n", x);
 
-        if (valid)
-        {
-            printf("User: %s is valid!\n", x);
-        }
-    }
+		if (!TryUserName(Socket, x, &valid))
+		{
+			break;
+		}
 
-    return TRUE;
+		if (valid)
+		{
+			printf("User: %s is valid!\n", x);
+		}
+	}
+
+	return TRUE;
 }
 
 
-int __cdecl main(int argc, char **argv) 
+int __cdecl main(int argc, char **argv)
 {
-    WSADATA wsaData;
-    SOCKET ConnectSocket = INVALID_SOCKET;
-    struct addrinfo *result = NULL,
-                    *ptr = NULL,
-                    hints;
-    char recvbuf[DEFAULT_BUFLEN];
-    int iResult;
-    int recvbuflen = DEFAULT_BUFLEN;
-    int cmd = 1;
+	WSADATA wsaData;
+	SOCKET ConnectSocket = INVALID_SOCKET;
+	struct addrinfo *result = NULL,
+		*ptr = NULL,
+		hints;
+	char recvbuf[DEFAULT_BUFLEN];
+	int iResult;
+	int recvbuflen = DEFAULT_BUFLEN;
+	int cmd = 1;
 
-    //*
-    char aaa[10] = "";
-    int aa = 9;
-    int a = sscanf_s(aaa, "", &aa);
-    printf("ret = %d (number = %d)\n", a, aa);
-    //*/
-    
-    // Validate the parameters
-    if (argc != 2) {
-        printf("usage: %s server-name\n", argv[0]);
+	/*
+	char aaa[10] = "";
+	int aa = 9;
+	int a = sscanf_s(aaa, "", &aa);
+	printf("ret = %d (number = %d)\n", a, aa);
+	*/
+
+	// Validate the parameters
+	if (argc != 2) {
+		printf("usage: %s server-name\n", argv[0]);
 		getchar();
-        return 1;
-    }
+		return 1;
+	}
 
-    // Initialize Winsock
-    iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-    if (iResult != 0) {
-        printf("WSAStartup failed with error: %d\n", iResult);
-        return 1;
-    }
+	// Initialize Winsock
+	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (iResult != 0) {
+		printf("WSAStartup failed with error: %d\n", iResult);
+		return 1;
+	}
 
-    ZeroMemory( &hints, sizeof(hints) );
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
+	ZeroMemory(&hints, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
 
-    // Resolve the server address and port
-    iResult = getaddrinfo(argv[1], DEFAULT_PORT, &hints, &result);
-    if ( iResult != 0 ) {
-        printf("getaddrinfo failed with error: %d\n", iResult);
-        WSACleanup();
-        return 1;
-    }
+	// Resolve the server address and port
+	iResult = getaddrinfo(argv[1], DEFAULT_PORT, &hints, &result);
+	if (iResult != 0) {
+		printf("getaddrinfo failed with error: %d\n", iResult);
+		WSACleanup();
+		return 1;
+	}
 
-    // Attempt to connect to an address until one succeeds
-    for(ptr=result; ptr != NULL ;ptr=ptr->ai_next) {
+	// Attempt to connect to an address until one succeeds
+	for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
 
-        // Create a SOCKET for connecting to server
-        ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, 
-            ptr->ai_protocol);
-        if (ConnectSocket == INVALID_SOCKET) {
-            printf("socket failed with error: %ld\n", WSAGetLastError());
-            WSACleanup();
-            return 1;
-        }
+		// Create a SOCKET for connecting to server
+		ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype,
+			ptr->ai_protocol);
+		if (ConnectSocket == INVALID_SOCKET) {
+			printf("socket failed with error: %ld\n", WSAGetLastError());
+			WSACleanup();
+			return 1;
+		}
 
-        // Connect to server.
-        iResult = connect( ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-        if (iResult == SOCKET_ERROR) {
-            closesocket(ConnectSocket);
-            ConnectSocket = INVALID_SOCKET;
-            continue;
-        }
-        break;
-    }
+		// Connect to server.
+		iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
+		if (iResult == SOCKET_ERROR) {
+			closesocket(ConnectSocket);
+			ConnectSocket = INVALID_SOCKET;
+			continue;
+		}
+		break;
+	}
 
-    freeaddrinfo(result);
+	freeaddrinfo(result);
 
-    if (ConnectSocket == INVALID_SOCKET) {
-        printf("Unable to connect to server!\n");
-        WSACleanup();
-        return 1;
-    }
+	if (ConnectSocket == INVALID_SOCKET) {
+		printf("Unable to connect to server!\n");
+		WSACleanup();
+		return 1;
+	}
 
-    printf("Connected to server (%s:%s). Enter commands:\n", argv[1], DEFAULT_PORT);
+	printf("Connected to server (%s:%s). Enter commands:\n", argv[1], DEFAULT_PORT);
 
-    do {
-        char input[DEFAULT_BUFLEN];
-        
-        // Accepting commands
-        printf("> ");
-        fgets(input, DEFAULT_BUFLEN, stdin);
-        if (strlen(input) == 1)
-        {
-            continue;
-        }
+	do {
+		char input[DEFAULT_BUFLEN];
 
-        // Remove CRLF
-        input[strlen(input) - 1] = 0;
+		// Accepting commands
+		printf("> ");
+		fgets(input, DEFAULT_BUFLEN, stdin);
+		if (strlen(input) == 1)
+		{
+			continue;
+		}
 
-        //
-        // Verify client side commands
-        //
-        if (0 == _stricmp(input, "quit"))
-        {
-            // EXIT
-            printf("Quitting without noticing the server...\n");
-            cmd = 0;    // not needed
-            break;
-        }
-        else if (0 == _stricmp(input, "help"))
-        {
-            PrintHelp();
-            cmd = 1;
-            continue;
-        }
-        else if (0 == _stricmp(input, "userbruteforce"))
-        {
-            if (UserBruteForce(ConnectSocket))
-            {
-                cmd = 1;
-            }
-            else
-            {
-                cmd = 0;
-            }
-            continue;
-        }
-        else
-        {
-            // Anything else. Send to server
-            cmd = 1;
-        }
+		// Remove CRLF
+		input[strlen(input) - 1] = 0;
 
-        // Send buffer
-        iResult = send( ConnectSocket, input, (int)strlen(input), 0 );
-        if (iResult == SOCKET_ERROR)
-        {
-            printf("send failed with error: %d\n", WSAGetLastError());
-            closesocket(ConnectSocket);
-            WSACleanup();
-            return 1;
-        }
+		//
+		// Verify client side commands
+		//
+		if (0 == _stricmp(input, "quit"))
+		{
+			// EXIT
+			printf("Quitting without noticing the server...\n");
+			cmd = 0;    // not needed
+			break;
+		}
+		else if (0 == _stricmp(input, "help"))
+		{
+			PrintHelp();
+			cmd = 1;
+			continue;
+		}
+		else if (0 == _stricmp(input, "userbruteforce"))
+		{
+			if (UserBruteForce(ConnectSocket))
+			{
+				cmd = 1;
+			}
+			else
+			{
+				cmd = 0;
+			}
+			continue;
+		}
+		else
+		{
+			// Anything else. Send to server
+			cmd = 1;
+		}
 
-        //printf("Bytes Sent: %ld\n", iResult);
+		// Send buffer
+		iResult = send(ConnectSocket, input, (int)strlen(input), 0);
+		if (iResult == SOCKET_ERROR)
+		{
+			printf("send failed with error: %d\n", WSAGetLastError());
+			closesocket(ConnectSocket);
+			WSACleanup();
+			return 1;
+		}
 
-        // Receive from server
-        iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-        if ( iResult > 0 )
-        {
-            //printf("Bytes received: %d\n", iResult);
+		//printf("Bytes Sent: %ld\n", iResult);
 
-            if (recvbuf[0] == '[')
-            {
-                // This is a text message
+		// Receive from server
+		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
+		if (iResult > 0)
+		{
+			//printf("Bytes received: %d\n", iResult);
 
-                recvbuf[iResult] = 0;
+			if (recvbuf[0] == '[')
+			{
+				// This is a text message
 
-                printf("%s\n", recvbuf);
+				recvbuf[iResult] = 0;
 
-                if (0 == _stricmp(recvbuf, "[OK] Exiting."))
-                {
-                    printf("Server is stopping, closing connection.\n");
-                    cmd = 0;
-                }
-            }
-            else
-            {
-                PrintBuffer(recvbuf, iResult);
-            }
-        }
-        else if ( iResult == 0 )
-        {
-            printf("Connection closed\n");
-        }
-        else
-        {
-            printf("recv failed with error: %d\n", WSAGetLastError());
-        }
+				printf("%s\n", recvbuf);
 
-    } while (cmd != 0);
+				if (0 == _stricmp(recvbuf, "[OK] Exiting."))
+				{
+					printf("Server is stopping, closing connection.\n");
+					cmd = 0;
+				}
+			}
+			else
+			{
+				PrintBuffer(recvbuf, iResult);
+			}
+		}
+		else if (iResult == 0)
+		{
+			printf("Connection closed\n");
+		}
+		else
+		{
+			printf("recv failed with error: %d\n", WSAGetLastError());
+		}
 
-    // shutdown the connection since no more data will be sent
-    iResult = shutdown(ConnectSocket, SD_SEND);
-    if (iResult == SOCKET_ERROR)
-    {
-        printf("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(ConnectSocket);
-        WSACleanup();
-        return 1;
-    }
+	} while (cmd != 0);
 
-    // cleanup
-    closesocket(ConnectSocket);
-    WSACleanup();
+	// shutdown the connection since no more data will be sent
+	iResult = shutdown(ConnectSocket, SD_SEND);
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("shutdown failed with error: %d\n", WSAGetLastError());
+		closesocket(ConnectSocket);
+		WSACleanup();
+		return 1;
+	}
 
-    return 0;
+	// cleanup
+	closesocket(ConnectSocket);
+	WSACleanup();
+
+	return 0;
 }

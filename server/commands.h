@@ -42,17 +42,21 @@ CmdHandleGet(
 void
 CmdHandleNewFile(
 	int UserId,
-	char *Message
+	_In_ char *Message,
+	_Out_ char *Output,
+	_Out_ size_t *OutLength
 );
 
 void CmdHandleWriteFile(
 	int UserId,
-	char *Message
+	_In_ char *Message
 );
 
 void CmdHandleEncryptFile(
 	int UserId,
-	char *Message
+	_In_ char *Message,
+	_Out_ char *Output,
+	_Out_ size_t *OutLength
 );
 
 #endif _COMMANDS_H_
